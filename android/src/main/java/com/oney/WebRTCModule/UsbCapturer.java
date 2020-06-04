@@ -31,10 +31,16 @@ public class UsbCapturer implements VideoCapturer, USBMonitor.OnDeviceConnectLis
     private final Object mSync = new Object();
     private boolean isRegister;
     private USBMonitor.UsbControlBlock ctrlBlock;
+    private VideoCaptureController videoCaptureController;
 
-    public UsbCapturer(Context context, SurfaceViewRenderer svVideoRender) {
+    public UsbCapturer(Context context, SurfaceViewRenderer svVideoRender, VideoCaptureController videoCaptureController) {
         this.svVideoRender = svVideoRender;
+        this.videoCaptureController = videoCaptureController;
         monitor = new USBMonitor(context, this);
+        if (!isRegister) {
+            isRegister = true;
+            monitor.register();
+        }
     }
 
     @Override
@@ -96,6 +102,7 @@ public class UsbCapturer implements VideoCapturer, USBMonitor.OnDeviceConnectLis
     public void onConnect(UsbDevice device, USBMonitor.UsbControlBlock ctrlBlock, boolean createNew) {
         Log.d(TAG, "onConnect:");
         UsbCapturer.this.ctrlBlock = ctrlBlock;
+        videoCaptureController.onConnectUSB();
         startPreview();
     }
 
@@ -105,6 +112,7 @@ public class UsbCapturer implements VideoCapturer, USBMonitor.OnDeviceConnectLis
         if (mCamera != null) {
             mCamera.close();
         }
+        videoCaptureController.onDisconnectUSB();
     }
 
     @Override

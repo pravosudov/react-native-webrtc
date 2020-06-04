@@ -26,10 +26,13 @@ public class VideoCaptureController {
 
     private boolean isFrontFacing;
 
-    private boolean isUsbMode;
+    private boolean usbMode;
+    private boolean usbConnected;
 
     private static UsbCapturer usbCapturer;
     private static VideoCapturer cameraCapturer;
+
+    private CapturerObserver capturerObserver;
 
     public static void setSurfaceViewRenderer(SurfaceViewRenderer renderer) {
         usbCapturer.setSvVideoRender(renderer);
@@ -69,7 +72,7 @@ public class VideoCaptureController {
         String deviceId = ReactBridgeUtil.getMapStrValue(constraints, "deviceId");
         String facingMode = ReactBridgeUtil.getMapStrValue(constraints, "facingMode");
 
-        usbCapturer = new UsbCapturer(ContextUtils.getApplicationContext(), null);
+        usbCapturer = new UsbCapturer(ContextUtils.getApplicationContext(), null, this);
         cameraCapturer = createVideoCapturer(deviceId, facingMode);
         videoCapturer = cameraCapturer;
     }
@@ -85,8 +88,25 @@ public class VideoCaptureController {
         return videoCapturer;
     }
 
-    public void initializeUSB(SurfaceTextureHelper var1, ReactApplicationContext var2, CapturerObserver var3) {
-        usbCapturer.initialize(var1, var2, var3);
+    public void setCapturerObserver(CapturerObserver capturerObserver) {
+        this.capturerObserver = capturerObserver;
+    }
+
+    public void onConnectUSB() {
+        try {
+            videoCapturer.stopCapture();
+        } catch (InterruptedException e) {
+        }
+        usbCapturer.initialize(null, null, capturerObserver);
+        videoCapturer = usbCapturer;
+        usbMode = true;
+        usbConnected = true;
+        isFrontFacing = false;
+        //switch to USB
+    }
+
+    public void onDisconnectUSB() {
+        //TODO: handle disconnect
     }
 
     public void startCapture() {
@@ -153,23 +173,25 @@ public class VideoCaptureController {
      */
     private void switchCamera(boolean desiredFrontFacing, int tries) {
 
-        if (desiredFrontFacing != true) {
-            //switch to usb when switching from front facing
+        if (usbConnected) {
+            if (desiredFrontFacing == true) {
+                //switch to usb when switching from back facing
 
-            try {
-                videoCapturer.stopCapture();
-            } catch (InterruptedException e) {
-            }
+                try {
+                    videoCapturer.stopCapture();
+                } catch (InterruptedException e) {
+                }
 
-            if (!isUsbMode) {
-                videoCapturer = usbCapturer;
-                videoCapturer.startCapture(width, height, fps);
-                isUsbMode = true;
-                return;
-            } else {
-                videoCapturer = cameraCapturer;
-                videoCapturer.startCapture(width, height, fps);
-                isUsbMode = false;
+                if (!usbMode) {
+                    videoCapturer = usbCapturer;
+                    videoCapturer.startCapture(width, height, fps);
+                    usbMode = true;
+                    return;
+                } else {
+                    videoCapturer = cameraCapturer;
+                    videoCapturer.startCapture(width, height, fps);
+                    usbMode = false;
+                }
             }
         }
 
