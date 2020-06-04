@@ -10,9 +10,7 @@ import org.webrtc.CameraVideoCapturer;
 import org.webrtc.VideoCapturer;
 import org.webrtc.ContextUtils;
 import org.webrtc.SurfaceViewRenderer;
-import org.webrtc.UsbCameraEnumerator;
 import org.webrtc.CapturerObserver;
-import org.webrtc.SurfaceTextureHelper;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,12 +29,6 @@ public class VideoCaptureController {
 
     private static UsbCapturer usbCapturer;
     private static VideoCapturer cameraCapturer;
-
-    private CapturerObserver capturerObserver;
-
-    public static void setSurfaceViewRenderer(SurfaceViewRenderer renderer) {
-        usbCapturer.setSvVideoRender(renderer);
-    }
 
     /**
      * Values for width, height and fps (respectively) which will be
@@ -63,7 +55,7 @@ public class VideoCaptureController {
     private VideoCapturer videoCapturer;
 
     public VideoCaptureController(CameraEnumerator cameraEnumerator, ReadableMap constraints) {
-        this.cameraEnumerator = new UsbCameraEnumerator(cameraEnumerator);
+        this.cameraEnumerator = cameraEnumerator;
 
         width = constraints.getInt("width");
         height = constraints.getInt("height");
@@ -88,21 +80,31 @@ public class VideoCaptureController {
         return videoCapturer;
     }
 
-    public void setCapturerObserver(CapturerObserver capturerObserver) {
-        this.capturerObserver = capturerObserver;
+    public static void setSurfaceViewRenderer(SurfaceViewRenderer renderer) {
+        usbCapturer.setSvVideoRender(renderer);
     }
 
-    public void onConnectUSB() {
+    public void setCapturerObserver(CapturerObserver capturerObserver) {
+        usbCapturer.initialize(null, null, capturerObserver);
+    }
+
+    private void switchUsbMode(boolean mode) {
         try {
             videoCapturer.stopCapture();
         } catch (InterruptedException e) {
         }
-        usbCapturer.initialize(null, null, capturerObserver);
-        videoCapturer = usbCapturer;
-        usbMode = true;
+        if (mode) {
+            videoCapturer = usbCapturer;
+        } else {
+            videoCapturer = cameraCapturer;
+        }
+        usbMode = mode;
+        startCapture();
+    }
+
+    public void onConnectUSB() {
         usbConnected = true;
-        isFrontFacing = false;
-        //switch to USB
+        switchUsbMode(true);
     }
 
     public void onDisconnectUSB() {
@@ -130,11 +132,21 @@ public class VideoCaptureController {
 
     public void switchCamera() {
 
-        String[] deviceNames = cameraEnumerator.getDeviceNames();
-        int deviceCount = deviceNames.length;
+        if (usbConnected) {
+            if (usbMode) {
+                switchUsbMode(false);
+            } else {
+                if (isFrontFacing) {
+                    switchUsbMode(true);
+                    return;
+                }
+            }
+        }
 
         if (videoCapturer instanceof CameraVideoCapturer) {
             CameraVideoCapturer capturer = (CameraVideoCapturer) videoCapturer;
+            String[] deviceNames = cameraEnumerator.getDeviceNames();
+            int deviceCount = deviceNames.length;
 
             // Nothing to switch to.
             if (deviceCount < 2) {
@@ -160,8 +172,6 @@ public class VideoCaptureController {
             // If we are here the device has more than 2 cameras. Cycle through them
             // and switch to the first one of the desired facing mode.
             switchCamera(!isFrontFacing, deviceCount);
-        } else if (videoCapturer instanceof UsbCapturer) {
-            switchCamera(!isFrontFacing, deviceCount);
         }
     }
 
@@ -172,29 +182,6 @@ public class VideoCaptureController {
      * @param tries - How many times to try switching.
      */
     private void switchCamera(boolean desiredFrontFacing, int tries) {
-
-        if (usbConnected) {
-            if (desiredFrontFacing == true) {
-                //switch to usb when switching from back facing
-
-                try {
-                    videoCapturer.stopCapture();
-                } catch (InterruptedException e) {
-                }
-
-                if (!usbMode) {
-                    videoCapturer = usbCapturer;
-                    videoCapturer.startCapture(width, height, fps);
-                    usbMode = true;
-                    return;
-                } else {
-                    videoCapturer = cameraCapturer;
-                    videoCapturer.startCapture(width, height, fps);
-                    usbMode = false;
-                }
-            }
-        }
-
         CameraVideoCapturer capturer = (CameraVideoCapturer) videoCapturer;
 
         capturer.switchCamera(new CameraVideoCapturer.CameraSwitchHandler() {

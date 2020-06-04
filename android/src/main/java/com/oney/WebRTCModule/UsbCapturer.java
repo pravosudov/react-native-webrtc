@@ -103,7 +103,6 @@ public class UsbCapturer implements VideoCapturer, USBMonitor.OnDeviceConnectLis
         Log.d(TAG, "onConnect:");
         UsbCapturer.this.ctrlBlock = ctrlBlock;
         videoCaptureController.onConnectUSB();
-        startPreview();
     }
 
     @Override
