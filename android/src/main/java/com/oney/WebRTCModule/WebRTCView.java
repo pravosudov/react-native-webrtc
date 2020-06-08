@@ -171,6 +171,7 @@ public class WebRTCView extends ViewGroup {
 
         surfaceViewRenderer = new SurfaceViewRenderer(context);
         VideoCaptureController.setSurfaceViewRenderer(surfaceViewRenderer);
+        VideoCaptureController.setWebRTCView(this);
         addView(surfaceViewRenderer);
 
         setMirror(false);

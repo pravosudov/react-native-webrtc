@@ -12,6 +12,8 @@ import org.webrtc.ContextUtils;
 import org.webrtc.SurfaceViewRenderer;
 import org.webrtc.CapturerObserver;
 
+import com.oney.WebRTCModule.WebRTCView;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,13 +24,14 @@ public class VideoCaptureController {
     private static final String TAG
         = VideoCaptureController.class.getSimpleName();
 
-    private boolean isFrontFacing;
+    private boolean isFrontFacing = true;
 
     private boolean usbMode;
     private boolean usbConnected;
 
     private static UsbCapturer usbCapturer;
     private static VideoCapturer cameraCapturer;
+    private static WebRTCView view;
 
     /**
      * Values for width, height and fps (respectively) which will be
@@ -70,10 +73,11 @@ public class VideoCaptureController {
     }
 
     public void dispose() {
-        if (videoCapturer != null) {
-            videoCapturer.dispose();
-            videoCapturer = null;
+        if (cameraCapturer != null) {
+            cameraCapturer.dispose();
+            cameraCapturer = null;
         }
+        isFrontFacing = true;
     }
 
     public VideoCapturer getVideoCapturer() {
@@ -84,18 +88,23 @@ public class VideoCaptureController {
         usbCapturer.setSvVideoRender(renderer);
     }
 
+    public static void setWebRTCView(WebRTCView webRTCView) {
+        view = webRTCView;
+    }
+
     public void setCapturerObserver(CapturerObserver capturerObserver) {
         usbCapturer.initialize(null, null, capturerObserver);
     }
 
     private void switchUsbMode(boolean mode) {
-        try {
-            videoCapturer.stopCapture();
-        } catch (InterruptedException e) {
-        }
         if (mode) {
+            try {
+                cameraCapturer.stopCapture();
+            } catch (InterruptedException e) {
+            }
             videoCapturer = usbCapturer;
         } else {
+            usbCapturer.stopCapture();
             videoCapturer = cameraCapturer;
         }
         usbMode = mode;
@@ -105,10 +114,20 @@ public class VideoCaptureController {
     public void onConnectUSB() {
         usbConnected = true;
         switchUsbMode(true);
+        if (isFrontFacing) {
+            view.setMirror(false);
+        }
     }
 
     public void onDisconnectUSB() {
-        //TODO: handle disconnect
+        usbConnected = false;
+        switchUsbMode(false);
+        if (isFrontFacing) {
+            view.setMirror(true);
+        } else {
+            view.setMirror(false);
+        }
+
     }
 
     public void startCapture() {
@@ -159,6 +178,11 @@ public class VideoCaptureController {
                     @Override
                     public void onCameraSwitchDone(boolean b) {
                         isFrontFacing = b;
+                        if (isFrontFacing) {
+                            view.setMirror(true);
+                        } else {
+                            view.setMirror(false);
+                        }
                     }
 
                     @Override
